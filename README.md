@@ -37,6 +37,8 @@ Making a multi-scene AI film means logging into Kling, CogVideoX, Seedance separ
 
 🎵 **Optional music** — opt-in terminal sink sends the finished cut to Sonilo and muxes the returned track (video stream untouched) as `final_with_music.mp4`. Track length matches the cut automatically.
 
+🔊 **Optional sound effects** — opt-in terminal sink sends the latest cut to Sonilo and mixes back royalty-free sound effects generated from the video, timed to the picture, as `final_with_sfx.mp4` — or `final_with_music_and_sfx.mp4` when the music sink ran first. Video stream untouched.
+
 ---
 
 ## End-to-end walkthrough
@@ -159,7 +161,7 @@ flowchart LR
 > [!NOTE]
 > No API keys? Use `--backend mock` for a full end-to-end run with zero external dependencies.
 
-**Requirements:** Python 3.11+ · ffmpeg · GPU optional (CogVideoX local needs CUDA 12+)
+**Requirements:** Python 3.11+ · ffmpeg (5.1+ to mix sound effects into a music track) · GPU optional (CogVideoX local needs CUDA 12+)
 
 ```bash
 git clone https://github.com/F-R-L/forge-film
@@ -241,6 +243,8 @@ KLING_API_SECRET=...
 | `routing.landscape` | any backend name | `cogvideo` |
 | `music.enabled` | bool | `false` |
 | `music.provider` | `sonilo` \| `mock` | `sonilo` |
+| `sfx.enabled` | bool | `false` |
+| `sfx.provider` | `sonilo` \| `mock` | `sonilo` |
 | `scheduler.workers` | int | `4` |
 
 ---
@@ -293,6 +297,8 @@ Yes — subclass `BasePipeline` in `forge/generation/base.py`, implement `genera
 **Does the final video have sound?**
 `final.mp4` is silent by default. Enable the optional music sink (`music.enabled: true` in `forge.yaml`, or `forge run --music`) to send the finished cut to Sonilo and get back an original track generated from the video — length matches automatically, and the output is licensed and safe for commercial use (terms apply). Needs a `SONILO_API_KEY`; the track is muxed as `final_with_music.mp4` and `final.mp4` stays untouched.
 
+There is also an optional SFX sink (`sfx.enabled: true`, or `forge run --sfx`) that sends the latest cut to Sonilo and mixes back royalty-free sound effects generated from the video, timed to the picture (videos up to 180 seconds). Written as `final_with_sfx.mp4` — or `final_with_music_and_sfx.mp4` when the music sink ran first, with the music track kept and the effects mixed into it. Both sinks share the same `SONILO_API_KEY`, can be enabled independently, always stream-copy the video, and never modify their input file. Note: mixing effects into an existing music track needs ffmpeg 5.1 or newer; SFX on a silent cut works with any ffmpeg.
+
 ---
 
 ## 🏗️ Architecture
@@ -309,7 +315,8 @@ forge.yaml
     │       └── ColorCalibrator   last-frame histogram match for i2v
     ├── VLM Validator    optional frame consistency check
     ├── StreamAssembler  ffmpeg concat → final.mp4
-    └── MusicSink        optional: Sonilo track muxed → final_with_music.mp4
+    ├── MusicSink        optional: Sonilo track muxed → final_with_music.mp4
+    └── SfxSink          optional: Sonilo sound effects mixed → final_with_sfx.mp4
 ```
 
 ---
@@ -319,18 +326,18 @@ forge.yaml
 ```
 forge/
   compiler/      # Story → DAG (LLM-driven)
-  providers/     # LLM / ImageGen / VLM / Music abstractions
+  providers/     # LLM / ImageGen / VLM / Music / SFX abstractions
   scheduler/     # DAG topology + CPM scheduling
   generation/    # Video backend pipelines
   continuity/    # Cross-model color calibration
   assets/        # Reference image generation + cache
   validation/    # VLM frame consistency check
-  assembler/     # Streaming video concatenation + optional music sink
+  assembler/     # Streaming video concatenation + optional audio sinks
   cli.py
   webui/
 forge.yaml
 examples/
-tests/         # 32 tests, no API keys needed
+tests/         # 46 tests, no API keys needed
 benchmarks/
 ```
 

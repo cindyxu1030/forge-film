@@ -45,6 +45,7 @@ forge/
     imagegen.py           #   ImageGenProvider: DALL·E / Flux / Mock
     vlm.py                #   VLMProvider: GPT-4o Vision / Claude Vision / Mock
     music.py              #   MusicProvider: Sonilo video-to-music / Mock
+    sfx.py                #   SfxProvider: Sonilo video-to-sfx / Mock
   scheduler/              # DAG topology + CPM priority scheduling
   generation/             # Video backend pipelines
     base.py               #   BasePipeline ABC
@@ -60,6 +61,7 @@ forge/
   assembler/              # Streaming moviepy concatenation (normalized fps/res)
     stream_assembler.py   #   ffmpeg concat → final.mp4
     music_sink.py         #   Optional terminal sink: music track for the final cut
+    sfx_sink.py           #   Optional terminal sink: sound effects for the final cut
 forge.yaml                # User-facing config (providers, routing, workers)
 tests/                    # pytest test suite
 benchmarks/               # Parallel vs serial benchmarks

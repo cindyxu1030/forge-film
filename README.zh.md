@@ -37,6 +37,8 @@
 
 🎵 **可选配乐** — 可选的终端 sink 节点：把成片发送给 Sonilo，将返回的音轨混流为 `final_with_music.mp4`（视频流原样复制）。音轨长度自动匹配成片。
 
+🔊 **可选音效** — 可选的终端 sink 节点：把最新成片发送给 Sonilo，混入根据视频生成、贴合画面时机的免版税音效，输出 `final_with_sfx.mp4`——若配乐 sink 先运行则输出 `final_with_music_and_sfx.mp4`。视频流原样复制。
+
 ---
 
 ## 端到端演示
@@ -173,7 +175,7 @@ forge run examples/detective.txt
 
 **依赖项：**
 - Python 3.11+
-- ffmpeg（需在 PATH 中）
+- ffmpeg（需在 PATH 中；将音效混入配乐音轨需 5.1 及以上版本）
 - 至少一个 API 密钥（OpenAI 用于编译；Kling / Seedance 用于视频生成），或使用 `mock` 后端做本地测试
 
 ---
@@ -245,6 +247,8 @@ KLING_API_SECRET=...
 | `routing.landscape` | 任意后端名称 | `cogvideo` |
 | `music.enabled` | 布尔值 | `false` |
 | `music.provider` | `sonilo` \| `mock` | `sonilo` |
+| `sfx.enabled` | 布尔值 | `false` |
+| `sfx.provider` | `sonilo` \| `mock` | `sonilo` |
 | `scheduler.workers` | 整数 | `4` |
 
 ---
@@ -297,6 +301,8 @@ KLING_API_SECRET=...
 **成片有声音吗？**
 `final.mp4` 默认是无声的。开启可选的配乐 sink（在 `forge.yaml` 中设 `music.enabled: true`，或运行 `forge run --music`）后，成片会被发送给 Sonilo，返回一条根据视频本身生成的原创音轨——长度自动匹配，输出经过授权、可安全商用（以服务条款为准）。需要 `SONILO_API_KEY`；音轨混流为 `final_with_music.mp4`，`final.mp4` 保持不变。
 
+另有可选的音效 sink（设 `sfx.enabled: true`，或运行 `forge run --sfx`）：把最新成片发送给 Sonilo，混入根据视频生成、贴合画面时机的免版税音效（视频最长 180 秒）。输出 `final_with_sfx.mp4`——若配乐 sink 先运行则输出 `final_with_music_and_sfx.mp4`，配乐音轨保留、音效混入其中。两个 sink 共用同一个 `SONILO_API_KEY`，可独立开启，视频流始终原样复制，输入文件不会被修改。注意：将音效混入已有配乐音轨需要 ffmpeg 5.1 及以上版本；给无声成片加音效则不限 ffmpeg 版本。
+
 ---
 
 ## 🏗️ 架构
@@ -312,7 +318,8 @@ ForgeConfig (forge.yaml)
             └── ColorCalibrator   最后一帧直方图匹配用于 i2v
     ├── VLM Validator    可选帧一致性检查
     ├── StreamAssembler  ffmpeg 拼接 → final.mp4
-    └── MusicSink        可选：混入 Sonilo 音轨 → final_with_music.mp4
+    ├── MusicSink        可选：混入 Sonilo 音轨 → final_with_music.mp4
+    └── SfxSink          可选：混入 Sonilo 音效 → final_with_sfx.mp4
 ```
 
 ---
@@ -322,18 +329,18 @@ ForgeConfig (forge.yaml)
 ```
 forge/
   compiler/      # 故事 → DAG（LLM 驱动）
-  providers/     # LLM / ImageGen / VLM / Music 抽象层
+  providers/     # LLM / ImageGen / VLM / Music / SFX 抽象层
   scheduler/     # DAG 拓扑 + CPM 调度
   generation/    # 视频后端 pipeline
   continuity/    # 跨模型色彩校准
   assets/        # 参考图像生成与缓存
   validation/    # VLM 帧一致性检查
-  assembler/     # 流式视频拼接 + 可选配乐 sink
+  assembler/     # 流式视频拼接 + 可选音频 sink
   cli.py
   webui/
 forge.yaml
 examples/
-tests/         # 32 个测试，无需 API key
+tests/         # 46 个测试，无需 API key
 benchmarks/
 ```
 
