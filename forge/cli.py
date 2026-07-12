@@ -20,10 +20,11 @@ def run(
     backend: str = typer.Option("", help="Override all backends: mock|kling|cogvideo"),
     output: Path = typer.Option(Path("./output"), help="Output directory"),
     no_validate: bool = typer.Option(False, "--no-validate", help="Skip VLM validation"),
+    music: bool = typer.Option(False, "--music", help="Add a generated music track to the final cut (needs SONILO_API_KEY)"),
     config: Path = typer.Option(Path("forge.yaml"), help="Path to forge.yaml config"),
 ):
     """Generate a film from a story file using multi-model DAG + CPM scheduling."""
-    asyncio.run(_run(story_file, scenes, workers, backend, str(output), no_validate, config))
+    asyncio.run(_run(story_file, scenes, workers, backend, str(output), no_validate, music, config))
 
 
 async def _run(
@@ -33,6 +34,7 @@ async def _run(
     backend_override: str,
     output_dir: str,
     no_validate: bool,
+    with_music: bool,
     config_path: Path,
 ):
     from forge.config import ForgeConfig
@@ -49,6 +51,22 @@ async def _run(
     cfg = ForgeConfig(config_path)
     story = Path(story_file).read_text(encoding="utf-8")
     t_start = time.monotonic()
+
+    # ── Step 0: Optional terminal music sink (built early to fail fast) ─
+    music_sink = None
+    if with_music or cfg.music_enabled:
+        from forge.assembler.music_sink import MusicSink
+        try:
+            music_provider = cfg.build_music_provider()
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
+        music_sink = MusicSink(
+            provider=music_provider,
+            output_path=os.path.join(output_dir, "final_with_music.mp4"),
+            prompt=cfg.music_prompt,
+            console=console,
+        )
 
     # ── Step 1: Compile story → ProductionPlan ──────────────────────────
     llm_provider = cfg.build_llm_provider()
@@ -135,7 +153,11 @@ async def _run(
         console.print(f"[red]Failed scenes: {failed_scenes}[/red]")
 
     # ── Step 7: Finalize assembly ────────────────────────────────────────
-    assembler.finalize()
+    final_path = assembler.finalize()
+
+    # ── Step 8: Optional music sink (consumes the assembled cut) ────────
+    if music_sink is not None:
+        await music_sink.finalize(final_path)
 
     wall = time.monotonic() - t_start
     stats = scheduler.stats

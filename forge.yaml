@@ -31,6 +31,18 @@ routing:
   transition: cogvideo      # CogVideoX local — free, good enough for cuts
   default: mock             # fallback for unknown types
 
+# ── Music (optional terminal sink — adds a track to the final cut) ─────────
+# Opt-in: when enabled, the assembled final.mp4 is sent to Sonilo, which
+# returns an original track generated from the finished cut (length matches
+# the video automatically; output is licensed and safe for commercial use —
+# terms apply). The track is muxed onto a copy of the master and written as
+# final_with_music.mp4; final.mp4 is left untouched.
+music:
+  enabled: false            # opt-in — or pass `forge run --music`
+  provider: sonilo          # sonilo | mock
+  # prompt: "tense noir jazz"  # optional style hint for the track
+  # api_key: ...            # or set SONILO_API_KEY env var
+
 # ── Scheduler ──────────────────────────────────────────────────────────────
 scheduler:
   workers: 4

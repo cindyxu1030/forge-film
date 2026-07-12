@@ -14,6 +14,7 @@ class ForgeSettings(BaseSettings):
     fal_api_key: str = ""
     kling_api_key: str = ""
     kling_api_secret: str = ""
+    sonilo_api_key: str = ""
     forge_workers: int = 4
     forge_video_backend: str = "mock"
     output_dir: str = "./output"
@@ -118,6 +119,26 @@ class ForgeConfig:
         defaults.update(self._raw.get("routing", {}))
         return defaults
 
+    # ── Music (optional terminal sink) ─────────────────────────────────────
+    @property
+    def music_enabled(self) -> bool:
+        return bool(self._raw.get("music", {}).get("enabled", False))
+
+    @property
+    def music_provider(self) -> str:
+        return self._raw.get("music", {}).get("provider", "sonilo")
+
+    @property
+    def music_prompt(self) -> str | None:
+        return self._raw.get("music", {}).get("prompt", None)
+
+    @property
+    def music_api_key(self) -> str:
+        raw_key = self._raw.get("music", {}).get("api_key", "")
+        if raw_key:
+            return raw_key
+        return self._env.sonilo_api_key or os.environ.get("SONILO_API_KEY", "")
+
     # ── Scheduler ──────────────────────────────────────────────────────────
     @property
     def workers(self) -> int:
@@ -160,6 +181,18 @@ class ForgeConfig:
         if p == "openai":
             return OpenAIImageGenProvider(api_key=key, model=model or "dall-e-3")
         return MockImageGenProvider()
+
+    def build_music_provider(self):
+        """Instantiate the configured Music provider.
+
+        Raises ValueError for the sonilo provider when no API key is set —
+        the music sink is opt-in, so a missing key is a config error, not
+        something to silently mock away.
+        """
+        from forge.providers.music import MockMusicProvider, SoniloMusicProvider
+        if self.music_provider == "mock":
+            return MockMusicProvider()
+        return SoniloMusicProvider(api_key=self.music_api_key)
 
     def build_vlm_provider(self):
         """Instantiate the configured VLM provider."""
