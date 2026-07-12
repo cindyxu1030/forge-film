@@ -28,7 +28,7 @@ cp .env.example .env
 All tests run without API keys — mock providers are used automatically.
 
 ```bash
-pytest tests/ -v  # should be 20/20 green
+pytest tests/ -v  # should be 32/32 green
 ```
 
 ---
@@ -44,6 +44,7 @@ forge/
     llm.py                #   LLMProvider: OpenAI / Anthropic / DeepSeek
     imagegen.py           #   ImageGenProvider: DALL·E / Flux / Mock
     vlm.py                #   VLMProvider: GPT-4o Vision / Claude Vision / Mock
+    music.py              #   MusicProvider: Sonilo video-to-music / Mock
   scheduler/              # DAG topology + CPM priority scheduling
   generation/             # Video backend pipelines
     base.py               #   BasePipeline ABC
@@ -57,6 +58,8 @@ forge/
   assets/                 # Reference image generation + disk cache
   validation/             # VLM frame consistency validation
   assembler/              # Streaming moviepy concatenation (normalized fps/res)
+    stream_assembler.py   #   ffmpeg concat → final.mp4
+    music_sink.py         #   Optional terminal sink: music track for the final cut
 forge.yaml                # User-facing config (providers, routing, workers)
 tests/                    # pytest test suite
 benchmarks/               # Parallel vs serial benchmarks

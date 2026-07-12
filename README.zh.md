@@ -35,6 +35,8 @@
 
 🎬 **最终拼接** — 所有场景生成完成后，通过一次 ffmpeg 统一拼接，归一化分辨率和帧率，输出 `final.mp4`。
 
+🎵 **可选配乐** — 可选的终端 sink 节点：把成片发送给 Sonilo，将返回的音轨混流为 `final_with_music.mp4`（视频流原样复制）。音轨长度自动匹配成片。
+
 ---
 
 ## 端到端演示
@@ -241,6 +243,8 @@ KLING_API_SECRET=...
 | `validator.provider` | `openai` \| `anthropic` \| `mock` | `mock` |
 | `routing.dialogue` | 任意后端名称 | `kling_light` |
 | `routing.landscape` | 任意后端名称 | `cogvideo` |
+| `music.enabled` | 布尔值 | `false` |
+| `music.provider` | `sonilo` \| `mock` | `sonilo` |
 | `scheduler.workers` | 整数 | `4` |
 
 ---
@@ -290,6 +294,9 @@ KLING_API_SECRET=...
 **能接入自己的视频模型吗？**
 可以——继承 `forge/generation/base.py` 中的 `BasePipeline`，实现 `generate()` 方法，并在路由器中注册。其他地方无需改动。
 
+**成片有声音吗？**
+`final.mp4` 默认是无声的。开启可选的配乐 sink（在 `forge.yaml` 中设 `music.enabled: true`，或运行 `forge run --music`）后，成片会被发送给 Sonilo，返回一条根据视频本身生成的原创音轨——长度自动匹配，输出经过授权、可安全商用（以服务条款为准）。需要 `SONILO_API_KEY`；音轨混流为 `final_with_music.mp4`，`final.mp4` 保持不变。
+
 ---
 
 ## 🏗️ 架构
@@ -304,7 +311,8 @@ ForgeConfig (forge.yaml)
             ├── PipelineRouter    scene_type → kling / cogvideo / seedance
             └── ColorCalibrator   最后一帧直方图匹配用于 i2v
     ├── VLM Validator    可选帧一致性检查
-    └── StreamAssembler  ffmpeg 拼接 → final.mp4
+    ├── StreamAssembler  ffmpeg 拼接 → final.mp4
+    └── MusicSink        可选：混入 Sonilo 音轨 → final_with_music.mp4
 ```
 
 ---
@@ -314,18 +322,18 @@ ForgeConfig (forge.yaml)
 ```
 forge/
   compiler/      # 故事 → DAG（LLM 驱动）
-  providers/     # LLM / ImageGen / VLM 抽象层
+  providers/     # LLM / ImageGen / VLM / Music 抽象层
   scheduler/     # DAG 拓扑 + CPM 调度
   generation/    # 视频后端 pipeline
   continuity/    # 跨模型色彩校准
   assets/        # 参考图像生成与缓存
   validation/    # VLM 帧一致性检查
-  assembler/     # 流式视频拼接
+  assembler/     # 流式视频拼接 + 可选配乐 sink
   cli.py
   webui/
 forge.yaml
 examples/
-tests/         # 20 个测试，无需 API key
+tests/         # 32 个测试，无需 API key
 benchmarks/
 ```
 

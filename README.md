@@ -35,6 +35,8 @@ Making a multi-scene AI film means logging into Kling, CogVideoX, Seedance separ
 
 🎬 **Final assembly** — once all scenes are generated, clips are concatenated in a single ffmpeg pass. Normalized resolution and frame rate. Outputs `final.mp4`.
 
+🎵 **Optional music** — opt-in terminal sink sends the finished cut to Sonilo and muxes the returned track (video stream untouched) as `final_with_music.mp4`. Track length matches the cut automatically.
+
 ---
 
 ## End-to-end walkthrough
@@ -237,6 +239,8 @@ KLING_API_SECRET=...
 | `validator.provider` | `openai` \| `anthropic` \| `mock` | `mock` |
 | `routing.dialogue` | any backend name | `kling_light` |
 | `routing.landscape` | any backend name | `cogvideo` |
+| `music.enabled` | bool | `false` |
+| `music.provider` | `sonilo` \| `mock` | `sonilo` |
 | `scheduler.workers` | int | `4` |
 
 ---
@@ -286,6 +290,9 @@ H.264 MP4 by default via ffmpeg. Resolution and frame rate are normalized across
 **Can I plug in my own video model?**
 Yes — subclass `BasePipeline` in `forge/generation/base.py`, implement `generate()`, and register it in the router. No changes needed elsewhere.
 
+**Does the final video have sound?**
+`final.mp4` is silent by default. Enable the optional music sink (`music.enabled: true` in `forge.yaml`, or `forge run --music`) to send the finished cut to Sonilo and get back an original track generated from the video — length matches automatically, and the output is licensed and safe for commercial use (terms apply). Needs a `SONILO_API_KEY`; the track is muxed as `final_with_music.mp4` and `final.mp4` stays untouched.
+
 ---
 
 ## 🏗️ Architecture
@@ -301,7 +308,8 @@ forge.yaml
     │       ├── PipelineRouter    scene_type → kling / cogvideo / seedance
     │       └── ColorCalibrator   last-frame histogram match for i2v
     ├── VLM Validator    optional frame consistency check
-    └── StreamAssembler  ffmpeg concat → final.mp4
+    ├── StreamAssembler  ffmpeg concat → final.mp4
+    └── MusicSink        optional: Sonilo track muxed → final_with_music.mp4
 ```
 
 ---
@@ -311,18 +319,18 @@ forge.yaml
 ```
 forge/
   compiler/      # Story → DAG (LLM-driven)
-  providers/     # LLM / ImageGen / VLM abstractions
+  providers/     # LLM / ImageGen / VLM / Music abstractions
   scheduler/     # DAG topology + CPM scheduling
   generation/    # Video backend pipelines
   continuity/    # Cross-model color calibration
   assets/        # Reference image generation + cache
   validation/    # VLM frame consistency check
-  assembler/     # Streaming video concatenation
+  assembler/     # Streaming video concatenation + optional music sink
   cli.py
   webui/
 forge.yaml
 examples/
-tests/         # 20 tests, no API keys needed
+tests/         # 32 tests, no API keys needed
 benchmarks/
 ```
 
