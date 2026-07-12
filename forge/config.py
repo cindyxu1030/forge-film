@@ -139,6 +139,26 @@ class ForgeConfig:
             return raw_key
         return self._env.sonilo_api_key or os.environ.get("SONILO_API_KEY", "")
 
+    # ── SFX (optional terminal sink) ───────────────────────────────────────
+    @property
+    def sfx_enabled(self) -> bool:
+        return bool(self._raw.get("sfx", {}).get("enabled", False))
+
+    @property
+    def sfx_provider(self) -> str:
+        return self._raw.get("sfx", {}).get("provider", "sonilo")
+
+    @property
+    def sfx_prompt(self) -> str | None:
+        return self._raw.get("sfx", {}).get("prompt", None)
+
+    @property
+    def sfx_api_key(self) -> str:
+        raw_key = self._raw.get("sfx", {}).get("api_key", "")
+        if raw_key:
+            return raw_key
+        return self._env.sonilo_api_key or os.environ.get("SONILO_API_KEY", "")
+
     # ── Scheduler ──────────────────────────────────────────────────────────
     @property
     def workers(self) -> int:
@@ -193,6 +213,18 @@ class ForgeConfig:
         if self.music_provider == "mock":
             return MockMusicProvider()
         return SoniloMusicProvider(api_key=self.music_api_key)
+
+    def build_sfx_provider(self):
+        """Instantiate the configured SFX provider.
+
+        Raises ValueError for the sonilo provider when no API key is set —
+        the SFX sink is opt-in, so a missing key is a config error, not
+        something to silently mock away.
+        """
+        from forge.providers.sfx import MockSfxProvider, SoniloSfxProvider
+        if self.sfx_provider == "mock":
+            return MockSfxProvider()
+        return SoniloSfxProvider(api_key=self.sfx_api_key)
 
     def build_vlm_provider(self):
         """Instantiate the configured VLM provider."""

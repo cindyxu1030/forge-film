@@ -21,10 +21,11 @@ def run(
     output: Path = typer.Option(Path("./output"), help="Output directory"),
     no_validate: bool = typer.Option(False, "--no-validate", help="Skip VLM validation"),
     music: bool = typer.Option(False, "--music", help="Add a generated music track to the final cut (needs SONILO_API_KEY)"),
+    sfx: bool = typer.Option(False, "--sfx", help="Add generated sound effects to the final cut (needs SONILO_API_KEY)"),
     config: Path = typer.Option(Path("forge.yaml"), help="Path to forge.yaml config"),
 ):
     """Generate a film from a story file using multi-model DAG + CPM scheduling."""
-    asyncio.run(_run(story_file, scenes, workers, backend, str(output), no_validate, music, config))
+    asyncio.run(_run(story_file, scenes, workers, backend, str(output), no_validate, music, sfx, config))
 
 
 async def _run(
@@ -35,6 +36,7 @@ async def _run(
     output_dir: str,
     no_validate: bool,
     with_music: bool,
+    with_sfx: bool,
     config_path: Path,
 ):
     from forge.config import ForgeConfig
@@ -67,6 +69,15 @@ async def _run(
             prompt=cfg.music_prompt,
             console=console,
         )
+
+    # ── Step 0b: Optional terminal SFX sink (provider built early to fail fast) ─
+    sfx_provider = None
+    if with_sfx or cfg.sfx_enabled:
+        try:
+            sfx_provider = cfg.build_sfx_provider()
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
 
     # ── Step 1: Compile story → ProductionPlan ──────────────────────────
     llm_provider = cfg.build_llm_provider()
@@ -155,9 +166,26 @@ async def _run(
     # ── Step 7: Finalize assembly ────────────────────────────────────────
     final_path = assembler.finalize()
 
-    # ── Step 8: Optional music sink (consumes the assembled cut) ────────
+    # ── Step 8: Optional audio sinks (music, then sound effects) ────────
+    # Each sink consumes the latest assembled cut and writes a new file;
+    # the video stream is stream-copied at every step and no prior output
+    # is modified. A sink failure just leaves the chain at its last output.
+    latest_path = final_path
     if music_sink is not None:
-        await music_sink.finalize(final_path)
+        music_result = await music_sink.finalize(latest_path)
+        if music_result:
+            latest_path = music_result
+
+    if sfx_provider is not None:
+        from forge.assembler.sfx_sink import SfxSink
+        sfx_name = "final_with_music_and_sfx.mp4" if latest_path != final_path else "final_with_sfx.mp4"
+        sfx_sink = SfxSink(
+            provider=sfx_provider,
+            output_path=os.path.join(output_dir, sfx_name),
+            prompt=cfg.sfx_prompt,
+            console=console,
+        )
+        await sfx_sink.finalize(latest_path)
 
     wall = time.monotonic() - t_start
     stats = scheduler.stats

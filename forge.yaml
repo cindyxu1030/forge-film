@@ -43,6 +43,20 @@ music:
   # prompt: "tense noir jazz"  # optional style hint for the track
   # api_key: ...            # or set SONILO_API_KEY env var
 
+# ── SFX (optional terminal sink — adds sound effects to the final cut) ─────
+# Opt-in: when enabled, the latest assembled cut is sent to Sonilo, which
+# returns royalty-free sound effects generated from the video, timed to the
+# picture (videos up to 180 seconds). The effects are muxed onto a copy of
+# the cut — the video stream is always stream-copied, and a track from the
+# music sink is kept, with the effects mixed into it. Written as
+# final_with_sfx.mp4, or final_with_music_and_sfx.mp4 when the music sink
+# ran first; the input file is left untouched.
+sfx:
+  enabled: false            # opt-in — or pass `forge run --sfx`
+  provider: sonilo          # sonilo | mock
+  # prompt: "rain on glass, distant thunder"  # optional description of the desired effects
+  # api_key: ...            # or set SONILO_API_KEY env var (shared with music)
+
 # ── Scheduler ──────────────────────────────────────────────────────────────
 scheduler:
   workers: 4
